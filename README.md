@@ -2,6 +2,8 @@
 
 從 PDF 文件中擷取英文單字的網頁工具，適合用於處理單字表、講義等教學文件。
 
+**Demo**: https://marshal604.github.io/9n-pdf-parse-tool/
+
 ## 功能特色
 
 - **PDF 解析**：上傳 PDF 檔案，自動擷取其中的英文單字
@@ -43,4 +45,7 @@ npm run build
 
 # 預覽生產版本
 npm run preview
+
+# 部署到 GitHub Pages
+npm run deploy
 ```
