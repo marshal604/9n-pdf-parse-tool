@@ -1,16 +1,46 @@
-# React + Vite
+# 9n PDF 單字擷取工具
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+從 PDF 文件中擷取英文單字的網頁工具，適合用於處理單字表、講義等教學文件。
 
-Currently, two official plugins are available:
+## 功能特色
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **PDF 解析**：上傳 PDF 檔案，自動擷取其中的英文單字
+- **智慧過濾**：自動移除中文、數字、括號內容、單一字母
+- **黑名單機制**：可自訂要過濾的單字（如人名、常見詞等），設定會儲存在瀏覽器中
+- **搜尋功能**：即時搜尋已擷取的單字
+- **A-Z 排序**：單字自動依字母順序排列
+- **匯出功能**：可將單字清單下載為 TXT 檔案
 
-## React Compiler
+## 安裝
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+# 安裝相依套件
+npm install
 
-## Expanding the ESLint configuration
+# 啟動開發伺服器
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## 使用方式
+
+1. 開啟網頁後，點擊「選擇 PDF 檔案」上傳你的 PDF
+2. 工具會自動解析並擷取英文單字
+3. 可在黑名單區塊新增要過濾的單字
+4. 使用搜尋框快速查找特定單字
+5. 點擊「下載 TXT」匯出單字清單
+
+## 技術架構
+
+- [React](https://react.dev/) 19
+- [Vite](https://vite.dev/) 7
+- [PDF.js](https://mozilla.github.io/pdf.js/) - Mozilla 的 PDF 解析函式庫
+
+## 建置
+
+```bash
+# 建置生產版本
+npm run build
+
+# 預覽生產版本
+npm run preview
+```
