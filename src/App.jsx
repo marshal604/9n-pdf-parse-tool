@@ -24,7 +24,7 @@ function App() {
   const [vocabularyData, setVocabularyData] = useState([]);
   const [searchText, setSearchText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [fileName, setFileName] = useState('');
+  const [fileNames, setFileNames] = useState([]);
   const [showBlacklist, setShowBlacklist] = useState(false);
   const [blacklist, setBlacklist] = useState([]);
   const [newBlacklistWord, setNewBlacklistWord] = useState('');
@@ -60,82 +60,97 @@ function App() {
     saveBlacklist(blacklist.filter(w => w !== wordToRemove));
   };
 
-  // 處理 PDF 上傳
+  // 解析單一 PDF 檔案
+  const parsePdf = async (file) => {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+    let allText = [];
+
+    // ============ 第一階段：PDF Parse ============
+    // 1. 把 * 都過濾掉
+    // 2. 依序把每個 text 組合起來，直到遇到空格
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+
+      // 按 y 座標分組（同一行），容差 3
+      const rows = {};
+      textContent.items.forEach(item => {
+        const y = Math.round(item.transform[5] / 3) * 3;
+        if (!rows[y]) rows[y] = [];
+        rows[y].push({
+          text: item.str,
+          x: item.transform[4]
+        });
+      });
+
+      // 每行按 x 排序，組合文字直到遇到空格
+      Object.values(rows).forEach(row => {
+        row.sort((a, b) => a.x - b.x);
+
+        // 找第一個非空白的 text，檢查是否以數字或中文開頭
+        const firstNonEmpty = row.find(item => item.text.trim() !== '');
+        if (firstNonEmpty) {
+          const firstChar = firstNonEmpty.text.trim().charAt(0);
+          // 如果是數字或中文開頭，跳過整行
+          if (/\d/.test(firstChar) || /[\u4e00-\u9fff]/.test(firstChar)) {
+            return;
+          }
+        }
+
+        let cellText = '';
+
+        row.forEach(item => {
+          let text = item.text;
+
+          // 過濾掉 *
+          text = text.replace(/\*/g, '');
+
+          if (text.trim() === '') {
+            // 遇到空格，儲存前面累積的文字
+            if (cellText) {
+              allText.push(cellText);
+            }
+            cellText = '';
+          } else {
+            // 繼續組合
+            cellText += text;
+          }
+        });
+
+        // 儲存最後累積的文字
+        if (cellText) {
+          allText.push(cellText);
+        }
+      });
+    }
+
+    return allText;
+  };
+
+  // 處理 PDF 上傳（支援多檔案）
   const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file || file.type !== 'application/pdf') {
+    const files = Array.from(event.target.files);
+    const pdfFiles = files.filter(file => file.type === 'application/pdf');
+
+    if (pdfFiles.length === 0) {
       alert('請上傳 PDF 檔案');
       return;
     }
 
+    if (pdfFiles.length !== files.length) {
+      alert(`已忽略 ${files.length - pdfFiles.length} 個非 PDF 檔案`);
+    }
+
     setIsLoading(true);
-    setFileName(file.name);
+    setFileNames(pdfFiles.map(f => f.name));
 
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-      let allText = [];
-
-      // ============ 第一階段：PDF Parse ============
-      // 1. 把 * 都過濾掉
-      // 2. 依序把每個 text 組合起來，直到遇到空格
-
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-
-        // 按 y 座標分組（同一行），容差 3
-        const rows = {};
-        textContent.items.forEach(item => {
-          const y = Math.round(item.transform[5] / 3) * 3;
-          if (!rows[y]) rows[y] = [];
-          rows[y].push({
-            text: item.str,
-            x: item.transform[4]
-          });
-        });
-
-        // 每行按 x 排序，組合文字直到遇到空格
-        Object.values(rows).forEach(row => {
-          row.sort((a, b) => a.x - b.x);
-
-          // 找第一個非空白的 text，檢查是否以數字或中文開頭
-          const firstNonEmpty = row.find(item => item.text.trim() !== '');
-          if (firstNonEmpty) {
-            const firstChar = firstNonEmpty.text.trim().charAt(0);
-            // 如果是數字或中文開頭，跳過整行
-            if (/\d/.test(firstChar) || /[\u4e00-\u9fff]/.test(firstChar)) {
-              return;
-            }
-          }
-
-          let cellText = '';
-
-          row.forEach(item => {
-            let text = item.text;
-
-            // 過濾掉 *
-            text = text.replace(/\*/g, '');
-
-            if (text.trim() === '') {
-              // 遇到空格，儲存前面累積的文字
-              if (cellText) {
-                allText.push(cellText);
-              }
-              cellText = '';
-            } else {
-              // 繼續組合
-              cellText += text;
-            }
-          });
-
-          // 儲存最後累積的文字
-          if (cellText) {
-            allText.push(cellText);
-          }
-        });
-      }
+      // 並行解析所有 PDF
+      const results = await Promise.all(pdfFiles.map(parsePdf));
+      const allText = results.flat();
 
       // ============ 第二階段：文字處理 ============
       // 1. 把括號跟括號裡面的字都移除
@@ -195,7 +210,9 @@ function App() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = fileName ? fileName.replace('.pdf', '.txt') : 'vocabulary.txt';
+    link.download = fileNames.length === 1
+      ? fileNames[0].replace('.pdf', '.txt')
+      : 'vocabulary.txt';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -218,6 +235,7 @@ function App() {
         <input
           type="file"
           accept=".pdf"
+          multiple
           onChange={handleFileUpload}
           style={{ display: 'none' }}
           id="pdf-upload"
@@ -233,11 +251,11 @@ function App() {
             display: 'inline-block'
           }}
         >
-          {isLoading ? '處理中...' : '選擇 PDF 檔案'}
+          {isLoading ? '處理中...' : '選擇 PDF 檔案（可多選）'}
         </label>
-        {fileName && (
+        {fileNames.length > 0 && (
           <p style={{ marginTop: '10px', color: '#666' }}>
-            已上傳：{fileName}
+            已上傳：{fileNames.length === 1 ? fileNames[0] : `${fileNames.length} 個檔案`}
           </p>
         )}
       </div>
